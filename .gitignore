@@ -1,0 +1,5 @@
+*.csv
+/myenv
+/reports
+/competition_details
+/data
