@@ -3,3 +3,5 @@
 /reports
 /competition_details
 /data
+*.env
+/lightfmenv

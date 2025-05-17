@@ -46,7 +46,7 @@ def load_and_preprocess_data():
         df_raw = pd.read_csv("../data/fnb_dataset/raw/dq_recsys_challenge_2025(in).csv")
         print("Successfully loaded real dataset.")
     except FileNotFoundError:
-        print("Dataset file not found. Using a dummy DataFrame.")
+        print("Dataset file not found.")
 
     df_raw['int_date'] = pd.to_datetime(df_raw['int_date'], format='%d-%b-%y')
     df_raw['user_id_str'] = df_raw['idcol'].astype(str)
