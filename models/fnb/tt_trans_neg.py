@@ -17,13 +17,13 @@ CONFIG = {
     "val_size": 0.15,  # Used for user_cold_start; for temporal, it's effectively leave-second-to-last-out per user
     "embedding_dim_ids": 32,
     "embedding_dim_features": 16,
-    "transformer_nhead": 4,
-    "transformer_nlayers": 2,
+    "transformer_nhead": 8,
+    "transformer_nlayers": 4,
     "transformer_dim_feedforward": 64,
     "final_mlp_embed_dim": 64,
     "learning_rate": 5e-4,
     "weight_decay": 1e-5,
-    "epochs": 3, # Max epochs
+    "epochs": 50, # Max epochs
     "batch_size": 1024,
     "top_k": 10,
     "random_state": 42,
