@@ -48,7 +48,7 @@ def load_and_preprocess_data():
         df_raw = pd.read_csv("../../data/fnb_dataset/raw/dq_recsys_challenge_2025(in).csv")
         print("Successfully loaded real data.")
     except FileNotFoundError:
-        print("RFile not found.")
+        print("File not found.")
         
 
     df_raw['int_date'] = pd.to_datetime(df_raw['int_date'], format='%d-%b-%y')
@@ -738,7 +738,7 @@ def main():
             # Create ground_truth_map for this segment
             ground_truth_map_segment = segment_test_df.groupby(USER_ID_COL)[ITEM_ID_COL].apply(set).to_dict()
 
-            # 1. Evaluate Main Model
+            # Evaluate Main Model
             if trained_model is not None:
                 print(f"Evaluating Main Model for {segment_name}...")
                 main_model_metrics = evaluate_model(trained_model, segment_test_loader, num_total_items,
@@ -751,7 +751,7 @@ def main():
             else:
                 print(f"Main Model not trained. Skipping its evaluation for {segment_name}.")
 
-            # 2. Evaluate Random Baseline
+            # Evaluate Random Baseline
             print(f"Evaluating Random Baseline for {segment_name}...")
             random_recs = generate_random_recommendations(current_segment_test_user_ids, num_total_items, CONFIG['top_k'])
             random_metrics = evaluate_baseline_recommendations(random_recs, segment_test_df, num_total_items, CONFIG['top_k'], desc=f"Random Baseline ({segment_name})")
@@ -759,7 +759,7 @@ def main():
                   f"Precision@{CONFIG['top_k']}: {random_metrics[f'Precision@{CONFIG['top_k']}']:.4f}, "
                   f"NDCG@{CONFIG['top_k']}: {random_metrics[f'NDCG@{CONFIG['top_k']}']:.4f}")
             
-            # 3. Evaluate Previously Bought Baseline
+            # Evaluate Previously Bought Baseline
             # Not necessary useful
             # print(f"Evaluating Previously Bought Baseline for {segment_name}...")
             # bought_recs = generate_previously_bought_recommendations(current_segment_test_user_ids, df_pos, CONFIG['top_k'])
@@ -768,7 +768,7 @@ def main():
             #       f"Precision@{CONFIG['top_k']}: {bought_metrics[f'Precision@{CONFIG['top_k']}']:.4f}, "
             #       f"NDCG@{CONFIG['top_k']}: {bought_metrics[f'NDCG@{CONFIG['top_k']}']:.4f}")
 
-            # 4. Evaluate Popularity Baseline
+            # Evaluate Popularity Baseline
             print(f"Evaluating Popularity Baseline for {segment_name}...")
             if not train_df.empty : # Popularity is derived from train_df
                 pop_metrics = calculate_popularity_baseline_metrics(
