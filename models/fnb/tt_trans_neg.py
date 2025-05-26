@@ -9,6 +9,7 @@ from tqdm import tqdm
 import copy
 import random
 from collections import Counter
+import os
 
 # Configuration
 CONFIG = {
@@ -23,7 +24,7 @@ CONFIG = {
     "final_mlp_embed_dim": 64,
     "learning_rate": 5e-4,
     "weight_decay": 1e-5,
-    "epochs": 50, # Max epochs
+    "epochs": 1, # Max epochs
     "batch_size": 1024,
     "top_k": 10,
     "random_state": 42,
@@ -638,7 +639,93 @@ def main():
         model = TwoTowerModel(user_tower_config={**common_cfg, "id_dim":num_total_users, "feature_cardinalities":user_cardinalities}, item_tower_config={**common_cfg, "id_dim":num_total_items, "feature_cardinalities":item_cardinalities}).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG['learning_rate'], weight_decay=CONFIG['weight_decay'])
         trained_model = train_model(model,train_loader,val_loader,optimizer,num_total_items,global_item_feats_t,user_features_df,item_features_df,val_df_gt,user_to_explicit_negs,encoders,item_self_info_scores)
-    
+       
+        # MODEL SAVING SECTION 
+        if trained_model:
+            model_save_dir = CONFIG.get('model_save_path', 'saved_models')
+            os.makedirs(model_save_dir, exist_ok=True)
+            
+            # PyTorch state_dict 
+            state_dict_path = os.path.join(model_save_dir, "two_tower_recsys_state_dict.pth")
+            torch.save(trained_model.state_dict(), state_dict_path)
+            print(f"Model state_dict saved to: {state_dict_path}")
+
+            # Exporting individual towers to ONNX for Netron visualization 
+            print("\nExporting model towers to ONNX for Netron visualization...")
+            trained_model.eval() 
+
+            # Export User Tower
+            try:
+                user_tower_onnx_path = os.path.join(model_save_dir, "user_tower.onnx")
+                # Create dummy inputs for the user tower
+                dummy_user_ids = torch.zeros(1, dtype=torch.long).to(device)
+                
+                # Determine the number of user features expected by the tower
+                num_user_features = 0
+                if hasattr(trained_model, 'user_tower') and hasattr(trained_model.user_tower, 'user_feat_embeds'):
+                    num_user_features = len(trained_model.user_tower.user_feat_embeds)
+                elif 'user_cardinalities' in locals() and user_cardinalities: # from earlier in main
+                    num_user_features = len(user_cardinalities)
+
+                dummy_user_side_features = torch.zeros(1, num_user_features, dtype=torch.long).to(device) if num_user_features > 0 else torch.empty(1, 0, dtype=torch.long).to(device)
+
+                if hasattr(trained_model, 'user_tower') and callable(trained_model.user_tower):
+                    torch.onnx.export(
+                        trained_model.user_tower,
+                        (dummy_user_ids, dummy_user_side_features),
+                        user_tower_onnx_path,
+                        input_names=['user_ids', 'user_features'],
+                        output_names=['user_embedding'],
+                        opset_version=20, 
+                        dynamic_axes={
+                            'user_ids': {0: 'batch_size'},
+                            'user_features': {0: 'batch_size'},
+                            'user_embedding': {0: 'batch_size'}
+                        }
+                    )
+                    print(f"User Tower exported to ONNX: {user_tower_onnx_path}")
+                else:
+                    print("Could not export User Tower: 'user_tower' attribute not found or not callable.")
+
+            except Exception as e:
+                print(f"Error exporting User Tower to ONNX: {e}")
+
+            # Export Item Tower 
+            try:
+                item_tower_onnx_path = os.path.join(model_save_dir, "item_tower.onnx")
+                # Create dummy inputs for the item tower
+                dummy_item_ids = torch.zeros(1, dtype=torch.long).to(device)
+
+                num_item_features = 0
+                if hasattr(trained_model, 'item_tower') and hasattr(trained_model.item_tower, 'item_feat_embeds'):
+                    num_item_features = len(trained_model.item_tower.item_feat_embeds)
+                elif 'item_cardinalities' in locals() and item_cardinalities: # from earlier in main
+                    num_item_features = len(item_cardinalities)
+                
+                dummy_item_side_features = torch.zeros(1, num_item_features, dtype=torch.long).to(device) if num_item_features > 0 else torch.empty(1, 0, dtype=torch.long).to(device)
+
+                if hasattr(trained_model, 'item_tower') and callable(trained_model.item_tower):
+                    torch.onnx.export(
+                        trained_model.item_tower,
+                        (dummy_item_ids, dummy_item_side_features),
+                        item_tower_onnx_path,
+                        input_names=['item_ids', 'item_features'],
+                        output_names=['item_embedding'],
+                        opset_version=20, # Consistent opset version
+                        dynamic_axes={
+                            'item_ids': {0: 'batch_size'},
+                            'item_features': {0: 'batch_size'},
+                            'item_embedding': {0: 'batch_size'}
+                        }
+                    )
+                    print(f"Item Tower exported to ONNX: {item_tower_onnx_path}")
+                else:
+                    print("Could not export Item Tower: 'item_tower' attribute not found or not callable.")
+
+            except Exception as e:
+                print(f"Error exporting Item Tower to ONNX: {e}")
+  
+
     all_item_vecs_norm_baseline = None
     if trained_model and num_total_items > 0:
         try:
@@ -655,7 +742,7 @@ def main():
     if all_item_vecs_norm_baseline is None and num_total_items > 0: print("Info: ILD for baselines might be 0.0.")
 
     print("\n--- Evaluating on Test Set ---")
-    if len(test_user_ids) > 0 and not test_df_gt.empty: # Ensure there are test users AND ground truth for them
+    if len(test_user_ids) > 0 and not test_df_gt.empty: 
         segments = {"All Test Users": test_user_ids} # test_user_ids are from the chosen split
         # Overall Cold Start: users with no positive interactions in the *entire original df_pos*
         all_pos_users_global = df_pos[USER_ID_COL].unique()
@@ -681,9 +768,7 @@ def main():
             current_segment_test_df_gt = test_df_gt[test_df_gt[USER_ID_COL].isin(seg_uids_unique)]
             if current_segment_test_df_gt.empty and not (seg_name.startswith("Overall Cold Start") and CONFIG['split_strategy'] == 'user_cold_start'): # Overall cold start may have no GT
                  print(f"Segment {seg_name} has no ground truth in test_df_gt. Metrics might be 0 or skip.")
-            
-            # For main model evaluation, DataLoader needs users. GT is passed separately to evaluate_model
-            # The items in segment_loader_df are placeholders if current_segment_test_df_gt is empty for these users.
+
             seg_loader_df = pd.DataFrame({USER_ID_COL: seg_uids_unique, ITEM_ID_COL: -1}) # Shell df for users in segment
             seg_test_dataset = InteractionDataset(seg_loader_df, global_user_feats_t, global_item_feats_t)
             seg_test_loader = DataLoader(seg_test_dataset, batch_size=CONFIG['batch_size']*2, shuffle=False, num_workers=0)
@@ -699,12 +784,6 @@ def main():
             rand_recs = generate_random_recommendations(seg_uids_unique, num_total_items, CONFIG['top_k'])
             rand_mets = calculate_metrics_for_baseline_recs(rand_recs, current_segment_test_df_gt, num_total_items, CONFIG['top_k'], item_self_info_scores, all_item_vecs_norm_baseline, f"Random ({seg_name})")
             print(f"Random Baseline ({seg_name}) Metrics:"); [print(f"  {k}: {v:.4f}") for k,v in rand_mets.items()]
-
-            # For "Previously Bought", use df_pos (all history before current split) for users in this segment
-            # However, if it's a temporal split, df_pos might contain future items for these users.
-            # For simplicity in "Previously Bought", let's use train_df if available, or df_pos otherwise.
-            # This is a choice: recommend from training history or global history. Global history makes it very strong.
-            # Let's use df_pos (global history) for a strong baseline.
             bought_recs = generate_previously_bought_recommendations(seg_uids_unique, df_pos, CONFIG['top_k'])
             bought_mets = calculate_metrics_for_baseline_recs(bought_recs, current_segment_test_df_gt, num_total_items, CONFIG['top_k'], item_self_info_scores, all_item_vecs_norm_baseline, f"PrevBought ({seg_name})")
             print(f"Prev. Bought Baseline ({seg_name}) Metrics:"); [print(f"  {k}: {v:.4f}") for k,v in bought_mets.items()]
