@@ -24,7 +24,7 @@ CONFIG = {
     "final_mlp_embed_dim": 64,
     "learning_rate": 5e-4,
     "weight_decay": 1e-5,
-    "epochs": 1, # Max epochs
+    "epochs": 50, # Max epochs
     "batch_size": 1024,
     "top_k": 10,
     "random_state": 42,
@@ -43,7 +43,7 @@ DATE_COL = 'int_date' # Assuming this is the name of your date column
 RAW_USER_FEATURE_COLS = {"segment": "segment_idx", "beh_segment": "beh_segment_idx", "active_ind": "active_ind_idx"}
 RAW_ITEM_FEATURE_COLS = {"item_type": "item_type_idx", "item_descrip": "item_descrip_idx"}
 
-# --- NumPy Metric Functions ---
+# NumPy Metric Functions 
 def numpy_recall_at_k(recommended_list, actual_set, k):
     if not actual_set: return 0.0
     recommended_list_k = recommended_list[:k]
@@ -755,9 +755,13 @@ def main():
         segments["Training Cold Start (0 Positive Train Interactions this Split)"] = training_cold_start_test_ids
 
         user_inter_counts_global = get_user_interaction_counts(df_pos) # Based on global positive interactions
-        interaction_bands = {"1-2 Pos Interactions Globally": user_inter_counts_global[user_inter_counts_global.isin([1,2])].index,
-                             "3-5 Pos Interactions Globally": user_inter_counts_global[user_inter_counts_global.isin([3,4,5])].index,
-                             ">5 Pos Interactions Globally": user_inter_counts_global[user_inter_counts_global > 5].index}
+        interaction_bands = {
+                            "1-2 Pos Interactions Globally": user_inter_counts_global[user_inter_counts_global.isin([1, 2])].index,
+                            "3-5 Pos Interactions Globally": user_inter_counts_global[user_inter_counts_global.isin([3, 4, 5])].index,
+                            "6-25 Pos Interactions Globally": user_inter_counts_global[(user_inter_counts_global > 5) & (user_inter_counts_global <= 25)].index,
+                            ">25 Pos Interactions Globally": user_inter_counts_global[user_inter_counts_global > 25].index
+                        }
+
         for band_name, band_uids in interaction_bands.items(): segments[band_name] = np.intersect1d(test_user_ids, band_uids.to_numpy())
 
         for seg_name, seg_uids in segments.items():

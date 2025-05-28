@@ -6,3 +6,4 @@
 *.env
 /lightfmenv
 /models/fnb/saved_models
+*.xlsx
