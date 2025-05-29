@@ -218,7 +218,7 @@ def plot_graph_4(df):
     title = "Graph 4: Main Model vs Popularity - @10 Metrics by Segment\n(User Cold Start Split)"
     metrics_to_plot = ["NDCG", "HR", "Novelty", "ILD"] # These are assumed to be @10 from context
     models_to_plot = ["Main Model", "Popularity Baseline"]
-    segments_to_plot = ["All Test Users", "Training Cold Start (0 Positive Train Interactions this Split)"]
+    segments_to_plot = [ "Training Cold Start (0 Positive Train Interactions this Split)", ">5 Pos Interactions Globally"]
     split_to_use = 'User Cold-Start' 
     
     # Filter data

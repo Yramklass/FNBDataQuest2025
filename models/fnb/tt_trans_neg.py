@@ -594,9 +594,7 @@ def main():
         train_user_ids = train_df[USER_ID_COL].unique() if not train_df.empty else np.array([])
         val_user_ids = val_df_gt[USER_ID_COL].unique() if not val_df_gt.empty else np.array([])
         test_user_ids = test_df_gt[USER_ID_COL].unique() if not test_df_gt.empty else np.array([])
-        # Ensure all users in val/test also exist in train for true temporal sequential eval
-        # This is implicitly handled by how InteractionDataset and evaluate_model work with user features
-        # as long as global_user_features_tensor covers all users.
+       
     else: raise ValueError(f"Unknown split_strategy: {CONFIG['split_strategy']}")
 
     print(f"Data split: Train users: {len(train_user_ids)}, Val users: {len(val_user_ids)}, Test users: {len(test_user_ids)}")
